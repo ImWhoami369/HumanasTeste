@@ -12,13 +12,19 @@ let myVideoStream;
 const myVideo = document.createElement('video');
 myVideo.muted = true; 
 
-// Servidores STUN públicos e estáveis do Google
+// 🚀 SOLUÇÃO DA CONEXÃO EXTERNA: Conectando à nuvem global pública do PeerJS
+// Isso permite que dispositivos em redes totalmente diferentes (4G, Wi-Fi externos) se vejam.
 const myPeer = new Peer(undefined, {
+  host: 'peerjs-server.herokuapp.com',
+  secure: true,
+  port: 443,
   config: {
     'iceServers': [
       { url: 'stun:stun.l.google.com:19302' },
       { url: 'stun:stun1.l.google.com:19302' },
-      { url: 'stun:stun2.l.google.com:19302' }
+      { url: 'stun:stun2.l.google.com:19302' },
+      { url: 'stun:stun3.l.google.com:19302' },
+      { url: 'stun:stun4.l.google.com:19302' }
     ]
   }
 });
@@ -28,7 +34,7 @@ const peers = {};
 enterBtn.addEventListener('click', () => {
   const nameValue = nicknameInput.value.trim();
   if (nameValue === "") {
-    alert("Digite seu nome!");
+    alert("Por favor, digite seu nome!");
     return;
   }
   myNickname = nameValue;
@@ -36,59 +42,68 @@ enterBtn.addEventListener('click', () => {
   lobbyContainer.style.display = 'none';
   meetingContainer.style.display = 'flex';
 
+  // Abre a câmera primeiro, depois conecta à rede
   startWebRTC();
 });
 
 function startWebRTC() {
   navigator.mediaDevices.getUserMedia({
-    video: { width: { max: 640 }, height: { max: 480 }, frameRate: { max: 24 } }, // Resolução otimizada para conexões externas não caírem
+    video: { 
+      width: { ideal: 640 }, 
+      height: { ideal: 360 }, 
+      frameRate: { ideal: 20 } 
+    },
     audio: true
   }).then(stream => {
     myVideoStream = stream;
+    
+    // Adiciona o seu próprio vídeo na tela em formato de janela do Meet
     addVideoStream(myVideo, stream, `${myNickname} (Você)`);
 
+    // Escuta chamadas de outras pessoas que entrarem depois
     myPeer.on('call', call => {
-      call.answer(stream);
-      const video = document.createElement('video');
+      call.answer(stream); // Responde enviando o seu vídeo
       
+      const video = document.createElement('video');
       call.on('stream', userVideoStream => {
         const senderName = call.options.metadata?.senderName || "Participante";
         addVideoStream(video, userVideoStream, senderName, call.peer);
       });
 
-      call.on('close', () => { video.parentElement.remove(); });
+      call.on('close', () => {
+        removerVideoDaTela(call.peer);
+      });
+
+      peers[call.peer] = call;
     });
 
-    // 🚨 O PULO DO GATO PARA CONEXÕES EXTERNAS:
-    // Damos um pequeno delay de 600ms antes de avisar o servidor.
-    // Isso garante que o hardware de câmera do celular terminou de ligar antes de receber chamadas externas.
-    setTimeout(() => {
-      socket.emit('join-room', 'unifesp-sala-principal', myPeer.id, myNickname);
-    }, 600);
+    // Envia o aviso ao servidor de que você entrou na sala
+    socket.emit('join-room', 'unifesp-sala-principal', myPeer.id, myNickname);
 
+    // Quando o servidor avisar que outro participante entrou, nós ligamos para ele
     socket.on('user-connected', (userId, userNickname) => {
-      // Pequeno atraso estratégico para dar tempo do outro dispositivo aceitar a oferta ICE
+      // Pequeno delay para garantir que a porta do outro dispositivo está aberta para receber chamadas
       setTimeout(() => {
         connectToNewUser(userId, stream, userNickname);
-      }, 400);
+      }, 800);
     });
 
   }).catch(err => {
-    console.error(err);
-    alert("Erro ao abrir câmera. Verifique as permissões de privacidade do seu celular.");
+    console.error("Erro ao acessar mídia: ", err);
+    alert("Atenção: Ative as permissões de Câmera e Microfone no seu navegador/celular para participar.");
   });
 }
 
 socket.on('user-disconnected', userId => {
   if (peers[userId]) peers[userId].close();
-  const containerToRemove = document.getElementById(`wrapper-${userId}`);
-  if (containerToRemove) containerToRemove.remove();
+  removerVideoDaTela(userId);
 });
 
 socket.on('update-peer-count', count => {
   if (participantCount) participantCount.innerText = count;
 });
 
+// Realiza a ligação para os novos integrantes que aparecem na sala
 function connectToNewUser(userId, stream, userNickname) {
   const call = myPeer.call(userId, stream, {
     metadata: { senderName: myNickname }
@@ -100,24 +115,27 @@ function connectToNewUser(userId, stream, userNickname) {
   });
   
   call.on('close', () => {
-    const containerToRemove = document.getElementById(`wrapper-${userId}`);
-    if (containerToRemove) containerToRemove.remove();
+    removerVideoDaTela(userId);
   });
 
   peers[userId] = call;
 }
 
+// Cria e renderiza as janelinhas dinâmicas
 function addVideoStream(video, stream, userName, userId = null) {
+  // Evita duplicar a janela se o evento disparar duas vezes por oscilação de rede
+  if (userId && document.getElementById(`wrapper-${userId}`)) return;
+
   video.srcObject = stream;
   video.classList.add('user-video');
   
-  // 🚨 CRUCIAL PARA CELULAR: Esses 3 atributos impedem que o iOS e Android abram o vídeo em pop-up/tela cheia
+  // Trava os reprodutores nativos do Safari (iOS) e Chrome (Android) para rodar embutido
   video.setAttribute('playsinline', 'true');
   video.setAttribute('webkit-playsinline', 'true');
   video.setAttribute('autoplay', 'true');
 
   video.addEventListener('loadedmetadata', () => {
-    video.play().catch(e => console.log("Play automático evitado, aguardando clique", e));
+    video.play().catch(err => console.log("Play automático aguardando interação", err));
   });
 
   const videoWrapper = document.createElement('div');
@@ -133,7 +151,12 @@ function addVideoStream(video, stream, userName, userId = null) {
   videoGrid.append(videoWrapper);
 }
 
-// Botões de controle
+function removerVideoDaTela(userId) {
+  const containerToRemove = document.getElementById(`wrapper-${userId}`);
+  if (containerToRemove) containerToRemove.remove();
+}
+
+// Controles de áudio e vídeo
 const micBtn = document.getElementById('mic-btn');
 const camBtn = document.getElementById('cam-btn');
 
