@@ -3,13 +3,17 @@ const app = express();
 const server = require('http').Server(app);
 const { ExpressPeerServer } = require('peer');
 
-// Configuração do Socket.io otimizada para o Render
+// 🚨 COMPATIBILIDADE MÁXIMA RENDER: Força a estabilização do túnel WebSocket
 const io = require('socket.io')(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
-  transports: ['websocket'] 
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  allowEIO3: true,
+  transports: ['websocket', 'polling'] // Permite fallback seguro se a rede do celular oscilar
 });
 
-// Configura o servidor PeerJS embutido rodando junto com o Express
 const peerServer = ExpressPeerServer(server, {
   debug: true,
   path: '/'
@@ -25,6 +29,8 @@ app.get('/', (req, res) => {
 let roomUsers = {};
 
 io.on('connection', socket => {
+  console.log('Novo dispositivo tentando conectar...');
+
   socket.on('join-room', (roomId, userId, userNickname) => {
     socket.join(roomId);
     socket.userId = userId;
@@ -33,11 +39,13 @@ io.on('connection', socket => {
     if (!roomUsers[roomId]) roomUsers[roomId] = new Set();
     roomUsers[roomId].add(userId);
 
-    // Avisa os outros aparelhos
+    console.log(`> ${userNickname} entrou na sala. Total: ${roomUsers[roomId].size}`);
+
+    // Sincroniza imediatamente com quem acabou de entrar e com os antigos
     socket.to(roomId).emit('user-connected', userId, userNickname);
     io.to(roomId).emit('update-peer-count', roomUsers[roomId].size);
 
-    // Chat de texto
+    // Ouvinte do Chat (Global para a Sala)
     socket.on('send-chat-message', (message) => {
       io.to(roomId).emit('chat-message', {
         name: userNickname,
@@ -50,6 +58,7 @@ io.on('connection', socket => {
         roomUsers[roomId].delete(userId);
         socket.to(roomId).emit('user-disconnected', userId);
         io.to(roomId).emit('update-peer-count', roomUsers[roomId].size);
+        console.log(`< Alguém saiu. Total restante: ${roomUsers[roomId].size}`);
       }
     });
   });
