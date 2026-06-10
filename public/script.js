@@ -1,4 +1,8 @@
-const socket = io('/', { transports: ['websocket'] });
+// Remove parâmetros fantasmas e força reconexão automática se cair o 4G
+const socket = io({
+  transports: ['websocket', 'polling'],
+  upgrade: true
+});
 
 const videoGrid = document.getElementById('video-grid');
 const participantCount = document.getElementById('participant-count');
@@ -12,7 +16,6 @@ let myVideoStream = null;
 const myVideo = document.createElement('video');
 myVideo.muted = true; 
 
-// 🚀 CONEXÃO LOCAL E DIRETA: O PeerJS agora conecta no SEU próprio servidor hospedado no Render
 const myPeer = new Peer(undefined, {
   path: '/peerjs',
   host: '/',
@@ -30,7 +33,6 @@ enterBtn.addEventListener('click', () => {
   }
   myNickname = nameValue;
 
-  // Garante que a transição de telas aconteça de forma limpa
   lobbyContainer.style.display = 'none';
   meetingContainer.style.display = 'flex';
 
@@ -46,7 +48,7 @@ function startWebRTC() {
     addVideoStream(myVideo, stream, `${myNickname} (Você)`);
     inicializarConexoes();
   }).catch(err => {
-    console.log("Sem câmera/microfone detectados. Entrando em modo ouvinte/texto.");
+    console.log("Sem dispositivos de mídia. Modo ouvinte.");
     addVideoStream(null, null, `${myNickname} (Você)`);
     inicializarConexoes();
   });
@@ -65,6 +67,7 @@ function inicializarConexoes() {
     peers[call.peer] = call;
   });
 
+  // Dispara entrada na sala
   socket.emit('join-room', 'unifesp-sala-principal', myPeer.id, myNickname);
 
   socket.on('user-connected', (userId, userNickname) => {
@@ -132,12 +135,13 @@ function removerVideoDaTela(userId) {
   if (containerToRemove) containerToRemove.remove();
 }
 
-// Lógica do Chat de Texto
+// LÓGICA DO CHAT DE TEXTO CORRIGIDA
 const chatInput = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
 const chatMessages = document.getElementById('chat-messages');
 const chatBoxBtn = document.getElementById('chat-box-btn');
 const chatContainer = document.getElementById('chat-container');
+const closeChatBtn = document.getElementById('close-chat-btn');
 
 function dispararMensagem() {
   const mensagem = chatInput.value.trim();
@@ -172,9 +176,22 @@ socket.on('chat-message', dados => {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 });
 
+// Abre o chat (Garante compatibilidade PC e Mobile)
 if (chatBoxBtn) {
   chatBoxBtn.addEventListener('click', () => {
     chatContainer.classList.toggle('open');
+    // Força exibição em bloco se o navegador mobile bugar com flex
+    if(window.innerWidth <= 768) {
+      chatContainer.style.display = chatContainer.classList.contains('open') ? 'flex' : 'none';
+    }
+  });
+}
+
+// Botão de voltar (Apenas Mobile)
+if (closeChatBtn) {
+  closeChatBtn.addEventListener('click', () => {
+    chatContainer.classList.remove('open');
+    chatContainer.style.display = 'none';
   });
 }
 
