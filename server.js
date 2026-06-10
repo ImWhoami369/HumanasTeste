@@ -3,15 +3,13 @@ const app = express();
 const server = require('http').Server(app);
 const { ExpressPeerServer } = require('peer');
 
-// 🚨 COMPATIBILIDADE MÁXIMA RENDER: Força a estabilização do túnel WebSocket
+// Configuração com CORS ultra-aberto e liberação de Polling para o Render
 const io = require('socket.io')(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"],
-    credentials: true
+    methods: ["GET", "POST"]
   },
-  allowEIO3: true,
-  transports: ['websocket', 'polling'] // Permite fallback seguro se a rede do celular oscilar
+  transports: ['polling', 'websocket'] // Deixamos ambos para o proxy do Render negociar a melhor rota
 });
 
 const peerServer = ExpressPeerServer(server, {
@@ -29,7 +27,8 @@ app.get('/', (req, res) => {
 let roomUsers = {};
 
 io.on('connection', socket => {
-  console.log('Novo dispositivo tentando conectar...');
+  // Assim que qualquer dispositivo conecta, ele já recebe o evento de confirmação
+  socket.emit('session-ready');
 
   socket.on('join-room', (roomId, userId, userNickname) => {
     socket.join(roomId);
@@ -39,13 +38,11 @@ io.on('connection', socket => {
     if (!roomUsers[roomId]) roomUsers[roomId] = new Set();
     roomUsers[roomId].add(userId);
 
-    console.log(`> ${userNickname} entrou na sala. Total: ${roomUsers[roomId].size}`);
-
-    // Sincroniza imediatamente com quem acabou de entrar e com os antigos
+    // Transmite para todos os outros dispositivos na sala
     socket.to(roomId).emit('user-connected', userId, userNickname);
     io.to(roomId).emit('update-peer-count', roomUsers[roomId].size);
 
-    // Ouvinte do Chat (Global para a Sala)
+    // Canal unificado do chat de texto
     socket.on('send-chat-message', (message) => {
       io.to(roomId).emit('chat-message', {
         name: userNickname,
@@ -58,7 +55,6 @@ io.on('connection', socket => {
         roomUsers[roomId].delete(userId);
         socket.to(roomId).emit('user-disconnected', userId);
         io.to(roomId).emit('update-peer-count', roomUsers[roomId].size);
-        console.log(`< Alguém saiu. Total restante: ${roomUsers[roomId].size}`);
       }
     });
   });
@@ -66,5 +62,5 @@ io.on('connection', socket => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`> Servidor Unifesp 3.0 rodando na porta ${PORT}`);
+  console.log(`> Servidor Unifesp unificado na porta ${PORT}`);
 });
