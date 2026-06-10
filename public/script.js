@@ -1,8 +1,5 @@
-// Remove parâmetros fantasmas e força reconexão automática se cair o 4G
-const socket = io({
-  transports: ['websocket', 'polling'],
-  upgrade: true
-});
+// Conecta usando o endpoint relativo padrão, permitindo que o Render gerencie os cabeçalhos HTTP
+const socket = io();
 
 const videoGrid = document.getElementById('video-grid');
 const participantCount = document.getElementById('participant-count');
@@ -16,9 +13,10 @@ let myVideoStream = null;
 const myVideo = document.createElement('video');
 myVideo.muted = true; 
 
+// Inicializa o Peer mapeando a URL exata em que o app está rodando (seja PC ou celular)
 const myPeer = new Peer(undefined, {
   path: '/peerjs',
-  host: '/',
+  host: location.hostname,
   port: location.port || (location.protocol === 'https:' ? 443 : 80),
   secure: location.protocol === 'https:'
 });
@@ -41,14 +39,14 @@ enterBtn.addEventListener('click', () => {
 
 function startWebRTC() {
   navigator.mediaDevices.getUserMedia({
-    video: { width: 640, height: 360 },
+    video: { width: 480, height: 270, frameRate: 15 }, // Resolução leve para rodar liso em redes móveis/4G
     audio: true
   }).then(stream => {
     myVideoStream = stream;
     addVideoStream(myVideo, stream, `${myNickname} (Você)`);
     inicializarConexoes();
   }).catch(err => {
-    console.log("Sem dispositivos de mídia. Modo ouvinte.");
+    console.log("Sem hardware de mídia detectado. Modo texto ativo.");
     addVideoStream(null, null, `${myNickname} (Você)`);
     inicializarConexoes();
   });
@@ -67,13 +65,13 @@ function inicializarConexoes() {
     peers[call.peer] = call;
   });
 
-  // Dispara entrada na sala
+  // Avisa o servidor da nossa entrada
   socket.emit('join-room', 'unifesp-sala-principal', myPeer.id, myNickname);
 
   socket.on('user-connected', (userId, userNickname) => {
     setTimeout(() => {
       connectToNewUser(userId, userNickname);
-    }, 1000);
+    }, 1200); // Delay sutil para celulares processarem o handshake WebRTC externo
   });
 }
 
@@ -113,7 +111,7 @@ function addVideoStream(video, stream, userName, userId = null) {
     video.setAttribute('playsinline', 'true');
     video.setAttribute('webkit-playsinline', 'true');
     video.setAttribute('autoplay', 'true');
-    video.addEventListener('loadedmetadata', () => { video.play(); });
+    video.addEventListener('loadedmetadata', () => { video.play().catch(e => console.log(e)); });
     videoWrapper.append(video);
   } else {
     const placeholder = document.createElement('div');
@@ -135,7 +133,7 @@ function removerVideoDaTela(userId) {
   if (containerToRemove) containerToRemove.remove();
 }
 
-// LÓGICA DO CHAT DE TEXTO CORRIGIDA
+// INTERAÇÃO DO CHAT DE TEXTO
 const chatInput = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
 const chatMessages = document.getElementById('chat-messages');
@@ -176,18 +174,15 @@ socket.on('chat-message', dados => {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 });
 
-// Abre o chat (Garante compatibilidade PC e Mobile)
 if (chatBoxBtn) {
   chatBoxBtn.addEventListener('click', () => {
     chatContainer.classList.toggle('open');
-    // Força exibição em bloco se o navegador mobile bugar com flex
     if(window.innerWidth <= 768) {
       chatContainer.style.display = chatContainer.classList.contains('open') ? 'flex' : 'none';
     }
   });
 }
 
-// Botão de voltar (Apenas Mobile)
 if (closeChatBtn) {
   closeChatBtn.addEventListener('click', () => {
     chatContainer.classList.remove('open');
