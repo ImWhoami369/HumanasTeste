@@ -10,8 +10,9 @@ const enterBtn = document.getElementById('enter-btn');
 let myNickname = "Usuário";
 let myVideoStream;
 const myVideo = document.createElement('video');
-myVideo.muted = true; 
+myVideo.muted = true; // Evita que você ouça o eco da sua própria voz
 
+// Inicializa o PeerJS configurando os servidores STUN do Google para a internet externa (Render)
 const myPeer = new Peer(undefined, {
   config: {
     'iceServers': [
@@ -23,6 +24,7 @@ const myPeer = new Peer(undefined, {
 
 const peers = {};
 
+// Evento ao clicar em Entrar no Lobby
 enterBtn.addEventListener('click', () => {
   const nameValue = nicknameInput.value.trim();
   if (nameValue === "") {
@@ -34,6 +36,7 @@ enterBtn.addEventListener('click', () => {
   lobbyContainer.style.display = 'none';
   meetingContainer.style.display = 'flex';
 
+  // Inicia a câmera só após o clique do usuário (Exigência dos navegadores modernos)
   startWebRTC();
 });
 
@@ -45,33 +48,38 @@ function startWebRTC() {
     myVideoStream = stream;
     addVideoStream(myVideo, stream, `${myNickname} (Você)`);
 
+    // Responde chamadas recebidas enviando o seu fluxo de vídeo
     myPeer.on('call', call => {
       call.answer(stream);
       const video = document.createElement('video');
       
       call.on('stream', userVideoStream => {
+        // Puxa o nome de quem está ligando através dos metadados da chamada
         const senderName = call.options.metadata?.senderName || "Participante";
         addVideoStream(video, userVideoStream, senderName, call.peer);
       });
 
       call.on('close', () => {
         video.parentElement.remove();
-        recalculateLayout(); // Recalcula quando alguém sai
+        recalculateLayout(); // Recalcula o mosaico quando alguém sai da chamada
       });
     });
 
+    // Entra na sala informando seu ID único e o seu Apelido
     socket.emit('join-room', 'unifesp-sala-principal', myPeer.id, myNickname);
 
+    // Quando outro usuário se conectar na sala, você liga para ele
     socket.on('user-connected', (userId, userNickname) => {
       connectToNewUser(userId, stream, userNickname);
     });
 
   }).catch(err => {
     console.error("Erro de mídia:", err);
-    alert("Habilite a câmera/microfone nas configurações do navegador.");
+    alert("Habilite a câmera/microfone nas configurações do navegador ou feche outros apps que possam estar usando ela.");
   });
 }
 
+// Remove o bloco do usuário que sair por desconexão voluntária
 socket.on('user-disconnected', userId => {
   if (peers[userId]) {
     peers[userId].close();
@@ -79,15 +87,18 @@ socket.on('user-disconnected', userId => {
   const containerToRemove = document.getElementById(`wrapper-${userId}`);
   if (containerToRemove) {
     containerToRemove.remove();
-    recalculateLayout(); // Recalcula quando alguém sai por queda de conexão
+    recalculateLayout(); // Ajusta o tamanho dos vídeos restantes
   }
 });
 
+// Atualiza o contador de cabeçalho
 socket.on('update-peer-count', count => {
   if (participantCount) participantCount.innerText = count;
 });
 
+// Função para originar ligações para novos integrantes
 function connectToNewUser(userId, stream, userNickname) {
+  // Anexa o seu apelido nos metadados antes de fazer a ligação WebRTC
   const call = myPeer.call(userId, stream, {
     metadata: { senderName: myNickname }
   });
@@ -109,8 +120,11 @@ function connectToNewUser(userId, stream, userNickname) {
   peers[userId] = call;
 }
 
+// Renderiza a janela de vídeo conforme as classes CSS do Meet
 function addVideoStream(video, stream, userName, userId = null) {
   video.srcObject = stream;
+  video.classList.add('user-video'); // Garante que a folha de estilo se aplique a este vídeo e não ao fundo
+  
   video.addEventListener('loadedmetadata', () => {
     video.play();
   });
@@ -129,7 +143,7 @@ function addVideoStream(video, stream, userName, userId = null) {
   videoWrapper.append(nameLabel);
   videoGrid.append(videoWrapper);
 
-  // Executa o cálculo matemático de mosaico toda vez que entra um vídeo novo
+  // Executa o algoritmo de mosaico dinâmico
   recalculateLayout();
 }
 
@@ -139,22 +153,20 @@ function recalculateLayout() {
   const count = allVideos.length;
   if (!count) return;
 
-  // Pega as dimensões da área disponível
+  // Pega as dimensões reais da área disponível na tela
   const containerWidth = videoGrid.offsetWidth;
   const containerHeight = videoGrid.offsetHeight;
 
   let bestWidth = 0;
   let bestHeight = 0;
 
-  // Testa qual a melhor distribuição de colunas e linhas para ocupar o máximo de tela mantendo a proporção 16:9
+  // Calcula a distribuição ideal de linhas e colunas para formato 16:9
   for (let cols = 1; cols <= count; cols++) {
     const rows = Math.ceil(count / cols);
     
-    // Calcula largura e altura máximas permitidas para esta combinação de colunas/linhas
-    let maxWidth = Math.floor(containerWidth / cols) - 14; // Desconta o gap
+    let maxWidth = Math.floor(containerWidth / cols) - 14; 
     let maxHeight = Math.floor(containerHeight / rows) - 14;
 
-    // Mantém a proporção de cinema (16 por 9)
     if (maxWidth * 9 / 16 < maxHeight) {
       maxHeight = maxWidth * 9 / 16;
     } else {
@@ -167,17 +179,17 @@ function recalculateLayout() {
     }
   }
 
-  // Aplica o tamanho perfeito calculado em todos os vídeos simultaneamente
+  // Redimensiona todas as caixas de vídeo proporcionalmente
   allVideos.forEach(wrapper => {
     wrapper.style.width = `${bestWidth}px`;
     wrapper.style.height = `${bestHeight}px`;
   });
 }
 
-// Recalcula o mosaico caso o usuário mude o tamanho da janela do navegador ou vire o celular
+// Se o usuário mudar o tamanho da janela ou girar o celular, recalculamos a grade
 window.addEventListener('resize', recalculateLayout);
 
-// Controles dos botões Mute e Câmera
+// Controles dos botões de Mudo e Câmera
 const micBtn = document.getElementById('mic-btn');
 const camBtn = document.getElementById('cam-btn');
 
