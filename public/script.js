@@ -10,25 +10,25 @@ const enterBtn = document.getElementById('enter-btn');
 let myNickname = "Usuário";
 let myVideoStream;
 const myVideo = document.createElement('video');
-myVideo.muted = true; // Evita que você ouça o eco da sua própria voz
+myVideo.muted = true; 
 
-// Inicializa o PeerJS configurando os servidores STUN do Google para a internet externa (Render)
+// Servidores STUN públicos e estáveis do Google
 const myPeer = new Peer(undefined, {
   config: {
     'iceServers': [
       { url: 'stun:stun.l.google.com:19302' },
-      { url: 'stun:stun1.l.google.com:19302' }
+      { url: 'stun:stun1.l.google.com:19302' },
+      { url: 'stun:stun2.l.google.com:19302' }
     ]
   }
 });
 
 const peers = {};
 
-// Evento ao clicar em Entrar no Lobby
 enterBtn.addEventListener('click', () => {
   const nameValue = nicknameInput.value.trim();
   if (nameValue === "") {
-    alert("Por favor, insira um apelido para entrar.");
+    alert("Digite seu nome!");
     return;
   }
   myNickname = nameValue;
@@ -36,104 +36,93 @@ enterBtn.addEventListener('click', () => {
   lobbyContainer.style.display = 'none';
   meetingContainer.style.display = 'flex';
 
-  // Inicia a câmera só após o clique do usuário (Exigência dos navegadores modernos)
   startWebRTC();
 });
 
 function startWebRTC() {
   navigator.mediaDevices.getUserMedia({
-    video: true,
+    video: { width: { max: 640 }, height: { max: 480 }, frameRate: { max: 24 } }, // Resolução otimizada para conexões externas não caírem
     audio: true
   }).then(stream => {
     myVideoStream = stream;
     addVideoStream(myVideo, stream, `${myNickname} (Você)`);
 
-    // Responde chamadas recebidas enviando o seu fluxo de vídeo
     myPeer.on('call', call => {
       call.answer(stream);
       const video = document.createElement('video');
       
       call.on('stream', userVideoStream => {
-        // Puxa o nome de quem está ligando através dos metadados da chamada
         const senderName = call.options.metadata?.senderName || "Participante";
         addVideoStream(video, userVideoStream, senderName, call.peer);
       });
 
-      call.on('close', () => {
-        video.parentElement.remove();
-        recalculateLayout(); // Recalcula o mosaico quando alguém sai da chamada
-      });
+      call.on('close', () => { video.parentElement.remove(); });
     });
 
-    // Entra na sala informando seu ID único e o seu Apelido
-    socket.emit('join-room', 'unifesp-sala-principal', myPeer.id, myNickname);
+    // 🚨 O PULO DO GATO PARA CONEXÕES EXTERNAS:
+    // Damos um pequeno delay de 600ms antes de avisar o servidor.
+    // Isso garante que o hardware de câmera do celular terminou de ligar antes de receber chamadas externas.
+    setTimeout(() => {
+      socket.emit('join-room', 'unifesp-sala-principal', myPeer.id, myNickname);
+    }, 600);
 
-    // Quando outro usuário se conectar na sala, você liga para ele
     socket.on('user-connected', (userId, userNickname) => {
-      connectToNewUser(userId, stream, userNickname);
+      // Pequeno atraso estratégico para dar tempo do outro dispositivo aceitar a oferta ICE
+      setTimeout(() => {
+        connectToNewUser(userId, stream, userNickname);
+      }, 400);
     });
 
   }).catch(err => {
-    console.error("Erro de mídia:", err);
-    alert("Habilite a câmera/microfone nas configurações do navegador ou feche outros apps que possam estar usando ela.");
+    console.error(err);
+    alert("Erro ao abrir câmera. Verifique as permissões de privacidade do seu celular.");
   });
 }
 
-// Remove o bloco do usuário que sair por desconexão voluntária
 socket.on('user-disconnected', userId => {
-  if (peers[userId]) {
-    peers[userId].close();
-  }
+  if (peers[userId]) peers[userId].close();
   const containerToRemove = document.getElementById(`wrapper-${userId}`);
-  if (containerToRemove) {
-    containerToRemove.remove();
-    recalculateLayout(); // Ajusta o tamanho dos vídeos restantes
-  }
+  if (containerToRemove) containerToRemove.remove();
 });
 
-// Atualiza o contador de cabeçalho
 socket.on('update-peer-count', count => {
   if (participantCount) participantCount.innerText = count;
 });
 
-// Função para originar ligações para novos integrantes
 function connectToNewUser(userId, stream, userNickname) {
-  // Anexa o seu apelido nos metadados antes de fazer a ligação WebRTC
   const call = myPeer.call(userId, stream, {
     metadata: { senderName: myNickname }
   });
   
   const video = document.createElement('video');
-  
   call.on('stream', userVideoStream => {
     addVideoStream(video, userVideoStream, userNickname, userId);
   });
   
   call.on('close', () => {
     const containerToRemove = document.getElementById(`wrapper-${userId}`);
-    if (containerToRemove) {
-      containerToRemove.remove();
-      recalculateLayout();
-    }
+    if (containerToRemove) containerToRemove.remove();
   });
 
   peers[userId] = call;
 }
 
-// Renderiza a janela de vídeo conforme as classes CSS do Meet
 function addVideoStream(video, stream, userName, userId = null) {
   video.srcObject = stream;
-  video.classList.add('user-video'); // Garante que a folha de estilo se aplique a este vídeo e não ao fundo
+  video.classList.add('user-video');
   
+  // 🚨 CRUCIAL PARA CELULAR: Esses 3 atributos impedem que o iOS e Android abram o vídeo em pop-up/tela cheia
+  video.setAttribute('playsinline', 'true');
+  video.setAttribute('webkit-playsinline', 'true');
+  video.setAttribute('autoplay', 'true');
+
   video.addEventListener('loadedmetadata', () => {
-    video.play();
+    video.play().catch(e => console.log("Play automático evitado, aguardando clique", e));
   });
 
   const videoWrapper = document.createElement('div');
   videoWrapper.classList.add('video-wrapper');
-  if(userId) {
-    videoWrapper.id = `wrapper-${userId}`;
-  }
+  if(userId) videoWrapper.id = `wrapper-${userId}`;
 
   const nameLabel = document.createElement('div');
   nameLabel.classList.add('user-name');
@@ -142,54 +131,9 @@ function addVideoStream(video, stream, userName, userId = null) {
   videoWrapper.append(video);
   videoWrapper.append(nameLabel);
   videoGrid.append(videoWrapper);
-
-  // Executa o algoritmo de mosaico dinâmico
-  recalculateLayout();
 }
 
-// 📐 Algoritmo Dinâmico de Mosaico (Igual ao algoritmo do Google Meet)
-function recalculateLayout() {
-  const allVideos = videoGrid.querySelectorAll('.video-wrapper');
-  const count = allVideos.length;
-  if (!count) return;
-
-  // Pega as dimensões reais da área disponível na tela
-  const containerWidth = videoGrid.offsetWidth;
-  const containerHeight = videoGrid.offsetHeight;
-
-  let bestWidth = 0;
-  let bestHeight = 0;
-
-  // Calcula a distribuição ideal de linhas e colunas para formato 16:9
-  for (let cols = 1; cols <= count; cols++) {
-    const rows = Math.ceil(count / cols);
-    
-    let maxWidth = Math.floor(containerWidth / cols) - 14; 
-    let maxHeight = Math.floor(containerHeight / rows) - 14;
-
-    if (maxWidth * 9 / 16 < maxHeight) {
-      maxHeight = maxWidth * 9 / 16;
-    } else {
-      maxWidth = maxHeight * 16 / 9;
-    }
-
-    if (maxWidth > bestWidth) {
-      bestWidth = maxWidth;
-      bestHeight = maxHeight;
-    }
-  }
-
-  // Redimensiona todas as caixas de vídeo proporcionalmente
-  allVideos.forEach(wrapper => {
-    wrapper.style.width = `${bestWidth}px`;
-    wrapper.style.height = `${bestHeight}px`;
-  });
-}
-
-// Se o usuário mudar o tamanho da janela ou girar o celular, recalculamos a grade
-window.addEventListener('resize', recalculateLayout);
-
-// Controles dos botões de Mudo e Câmera
+// Botões de controle
 const micBtn = document.getElementById('mic-btn');
 const camBtn = document.getElementById('cam-btn');
 
