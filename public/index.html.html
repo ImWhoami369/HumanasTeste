@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unifesp 3.0 - Sala de Reunião</title>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    /* Estilização do Background e Reset Global */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      /* Background moderno em degradê escuro com textura suave */
+      background: linear-gradient(135deg, #11121a 0%, #1e2030 100%);
+      color: #ffffff;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Cabeçalho superior (Nome da sala / Infos) */
+    header {
+      padding: 15px 30px;
+      background: rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(10px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .room-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .room-title .live-indicator {
+      width: 8px;
+      height: 8px;
+      background-color: #2ec4b6;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #2ec4b6;
+    }
+
+    /* Grid de Vídeos Inteligente */
+    #video-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    #video-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+      width: 100%;
+      max-width: 1200px;
+      max-height: 85%;
+    }
+
+    /* Estilo das janelas de vídeo dos participantes */
+    .video-wrapper {
+      position: relative;
+      background: #151622;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      aspect-ratio: 16 / 9;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1); /* Efeito espelho natural */
+    }
+
+    /* Nome do participante sobreposto ao vídeo */
+    .user-name {
+      position: absolute;
+      bottom: 15px;
+      left: 15px;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    /* Menu de Controles Inferior (Estilo Glassmorphism) */
+    .controls-panel {
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: rgba(15, 16, 26, 0.65);
+      backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      position: relative;
+    }
+
+    .controls-wrapper {
+      display: flex;
+      gap: 15px;
+    }
+
+    .control-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .control-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+
+    /* Botão de desligar vermelho destacado */
+    .control-btn.leave-btn {
+      background: #e63946;
+      border: none;
+    }
+
+    .control-btn.leave-btn:hover {
+      background: #ff4d5a;
+      box-shadow: 0 0 15px rgba(230, 57, 70, 0.4);
+    }
+
+    /* Classe para quando o áudio/vídeo estiver mutado */
+    .control-btn.muted {
+      background: #4a4e69;
+      color: #f7a7a6;
+    }
+  </style>
+
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+
+  <header>
+    <div class="room-title">
+      <div class="live-indicator"></div>
+      <span>Reunião Acadêmica - Unifesp 3.0</span>
+    </div>
+    <div style="font-size: 0.9rem; color: #a0a5c1;">
+      <i class="fa-solid fa-user-group"></i> <span id="participant-count">1</span> online
+    </div>
+  </header>
+
+  <div id="video-container">
+    <div id="video-grid">
+      </div>
+  </div>
+
+  <div class="controls-panel">
+    <div class="controls-wrapper">
+      
+      <button class="control-btn" id="mic-btn" title="Mudar Microfone">
+        <i class="fa-solid fa-microphone"></i>
+      </button>
+
+      <button class="control-btn" id="cam-btn" title="Mudar Câmera">
+        <i class="fa-solid fa-video"></i>
+      </button>
+
+      <button class="control-btn" id="share-btn" title="Compartilhar Tela">
+        <i class="fa-solid fa-desktop"></i>
+      </button>
+
+      <button class="control-btn leave-btn" onclick="window.location.href='https://unifesp.br'" title="Sair da Reunião">
+        <i class="fa-solid fa-phone-slash"></i>
+      </button>
+      
+    </div>
+  </div>
+
+</body>
+</html>
