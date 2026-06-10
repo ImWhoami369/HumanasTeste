@@ -19,7 +19,7 @@
       overflow: hidden;
     }
 
-    /* Tela de Login / Nickname (Lobby) */
+    /* Tela de Lobby / Apelido */
     #lobby-container {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -54,6 +54,7 @@
       font-size: 1rem;
       margin-bottom: 20px;
       outline: none;
+      text-align: center;
     }
 
     .lobby-box input:focus { border-color: #2ec4b6; }
@@ -73,9 +74,9 @@
 
     .lobby-box button:hover { background: #20a396; }
 
-    /* Interface da Reunião (Escondida inicialmente) */
+    /* Container da sala de reunião (Fica invisível no início) */
     #meeting-container {
-      display: none; /* Só aparece após o login */
+      display: none;
       flex-direction: column;
       height: 100vh;
       width: 100%;
@@ -101,6 +102,7 @@
     video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
     .user-name { position: absolute; bottom: 15px; left: 15px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 500; }
 
+    /* Barra de Controles */
     .controls-panel { padding: 20px; display: flex; justify-content: center; align-items: center; background: rgba(15, 16, 26, 0.65); backdrop-filter: blur(20px); border-top: 1px solid rgba(255, 255, 255, 0.05); }
     .controls-wrapper { display: flex; gap: 15px; }
     .control-btn { width: 50px; height: 50px; border-radius: 50%; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.1); color: #ffffff; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
