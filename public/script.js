@@ -1,7 +1,4 @@
-// 🚨 TRAVA DO WEBSOCKET: Configuração mandatória para que o Render junte as salas
-const socket = io('/', {
-  transports: ['websocket']
-});
+const socket = io('/', { transports: ['websocket'] });
 
 const videoGrid = document.getElementById('video-grid');
 const participantCount = document.getElementById('participant-count');
@@ -15,17 +12,12 @@ let myVideoStream = null;
 const myVideo = document.createElement('video');
 myVideo.muted = true; 
 
-// Conexão via servidor em nuvem redundante do PeerJS
+// 🚀 CONEXÃO LOCAL E DIRETA: O PeerJS agora conecta no SEU próprio servidor hospedado no Render
 const myPeer = new Peer(undefined, {
-  host: 'peerjs-server.herokuapp.com',
-  secure: true,
-  port: 443,
-  config: {
-    'iceServers': [
-      { url: 'stun:stun.l.google.com:19302' },
-      { url: 'stun:stun1.l.google.com:19302' }
-    ]
-  }
+  path: '/peerjs',
+  host: '/',
+  port: location.port || (location.protocol === 'https:' ? 443 : 80),
+  secure: location.protocol === 'https:'
 });
 
 const peers = {};
@@ -38,7 +30,7 @@ enterBtn.addEventListener('click', () => {
   }
   myNickname = nameValue;
 
-  lobbyContainer.style.style.setProperty('display', 'none', 'important');
+  // Garante que a transição de telas aconteça de forma limpa
   lobbyContainer.style.display = 'none';
   meetingContainer.style.display = 'flex';
 
@@ -46,27 +38,23 @@ enterBtn.addEventListener('click', () => {
 });
 
 function startWebRTC() {
-  // Tenta capturar câmera e áudio
   navigator.mediaDevices.getUserMedia({
     video: { width: 640, height: 360 },
     audio: true
   }).then(stream => {
     myVideoStream = stream;
     addVideoStream(myVideo, stream, `${myNickname} (Você)`);
-    inicializarEventosPeerESocket();
+    inicializarConexoes();
   }).catch(err => {
-    console.log("Dispositivo sem hardware de mídia (Webcam/Mic). Entrando apenas em modo de texto/escuta.");
-    
-    // 💡 SUPORTE PARA PC SEM WEBCAM: Cria uma janela preta elegante com as suas iniciais
+    console.log("Sem câmera/microfone detectados. Entrando em modo ouvinte/texto.");
     addVideoStream(null, null, `${myNickname} (Você)`);
-    inicializarEventosPeerESocket();
+    inicializarConexoes();
   });
 }
 
-function inicializarEventosPeerESocket() {
-  // Atende ligações de terceiros se você tiver câmera ativa
+function inicializarConexoes() {
   myPeer.on('call', call => {
-    call.answer(myVideoStream); // Se myVideoStream for null, ele responde sem stream de volta (normal)
+    call.answer(myVideoStream);
     const video = document.createElement('video');
     
     call.on('stream', userVideoStream => {
@@ -77,10 +65,8 @@ function inicializarEventosPeerESocket() {
     peers[call.peer] = call;
   });
 
-  // Notifica o servidor imediatamente
   socket.emit('join-room', 'unifesp-sala-principal', myPeer.id, myNickname);
 
-  // Conecta ao novo integrante assim que ele entra
   socket.on('user-connected', (userId, userNickname) => {
     setTimeout(() => {
       connectToNewUser(userId, userNickname);
@@ -98,7 +84,6 @@ socket.on('update-peer-count', count => {
 });
 
 function connectToNewUser(userId, userNickname) {
-  // Origina a chamada passando a nossa mídia (pode ser null se o PC não tiver câmera)
   const call = myPeer.call(userId, myVideoStream, {
     metadata: { senderName: myNickname }
   });
@@ -119,7 +104,6 @@ function addVideoStream(video, stream, userName, userId = null) {
   videoWrapper.classList.add('video-wrapper');
   if(userId) videoWrapper.id = `wrapper-${userId}`;
 
-  // Se houver sinal de vídeo/stream (Aparelho possui câmera)
   if (video && stream) {
     video.srcObject = stream;
     video.classList.add('user-video');
@@ -129,7 +113,6 @@ function addVideoStream(video, stream, userName, userId = null) {
     video.addEventListener('loadedmetadata', () => { video.play(); });
     videoWrapper.append(video);
   } else {
-    // Se não houver câmera (Caso do seu PC de testes), gera caixa de texto com iniciais
     const placeholder = document.createElement('div');
     placeholder.classList.add('no-cam-placeholder');
     placeholder.innerText = userName.substring(0, 2).toUpperCase();
@@ -149,7 +132,7 @@ function removerVideoDaTela(userId) {
   if (containerToRemove) containerToRemove.remove();
 }
 
-// 💬 ENGENHARIA DO CHAT DE TEXTO (SOCKET.IO)
+// Lógica do Chat de Texto
 const chatInput = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
 const chatMessages = document.getElementById('chat-messages');
@@ -164,12 +147,13 @@ function dispararMensagem() {
   }
 }
 
-sendBtn.addEventListener('click', dispararMensagem);
-chatInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') dispararMensagem();
-});
+if (sendBtn) sendBtn.addEventListener('click', dispararMensagem);
+if (chatInput) {
+  chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') dispararMensagem();
+  });
+}
 
-// Printa a mensagem na tela de todo mundo de forma instantânea
 socket.on('chat-message', dados => {
   const msgBox = document.createElement('div');
   msgBox.classList.add('message-box');
@@ -185,17 +169,16 @@ socket.on('chat-message', dados => {
   msgBox.append(autor);
   msgBox.append(texto);
   chatMessages.append(msgBox);
-
-  // Faz o scroll descer automaticamente para a última mensagem enviada
   chatMessages.scrollTop = chatMessages.scrollHeight;
 });
 
-// Abre e fecha o chat lateral no celular
-chatBoxBtn.addEventListener('click', () => {
-  chatContainer.classList.toggle('open');
-});
+if (chatBoxBtn) {
+  chatBoxBtn.addEventListener('click', () => {
+    chatContainer.classList.toggle('open');
+  });
+}
 
-// Controles mutar áudio e vídeo
+// Botões de mudo
 const micBtn = document.getElementById('mic-btn');
 const camBtn = document.getElementById('cam-btn');
 
