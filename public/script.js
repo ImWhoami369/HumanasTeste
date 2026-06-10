@@ -10,8 +10,9 @@ const enterBtn = document.getElementById('enter-btn');
 let myNickname = "Usuário";
 let myVideoStream;
 const myVideo = document.createElement('video');
-myVideo.muted = true; 
+myVideo.muted = true; // Evita que você ouça o eco da sua própria voz
 
+// Inicializa o PeerJS configurando os servidores STUN do Google para a internet externa
 const myPeer = new Peer(undefined, {
   config: {
     'iceServers': [
@@ -23,7 +24,7 @@ const myPeer = new Peer(undefined, {
 
 const peers = {};
 
-// Escuta o clique para entrar na reunião
+// Evento ao clicar em Entrar no Lobby
 enterBtn.addEventListener('click', () => {
   const nameValue = nicknameInput.value.trim();
   if (nameValue === "") {
@@ -32,11 +33,10 @@ enterBtn.addEventListener('click', () => {
   }
   myNickname = nameValue;
 
-  // Esconde o lobby e mostra a reunião
   lobbyContainer.style.display = 'none';
   meetingContainer.style.display = 'flex';
 
-  // Inicializa o WebRTC após o clique (Evita bloqueios automáticos do navegador)
+  // Inicia a câmera só após o clique do usuário (Exigência dos navegadores modernos)
   startWebRTC();
 });
 
@@ -48,16 +48,13 @@ function startWebRTC() {
     myVideoStream = stream;
     addVideoStream(myVideo, stream, `${myNickname} (Você)`);
 
-    // Atende chamadas e escuta os dados extras (como o nome do outro participante)
+    // Responde chamadas recebidas enviando o seu fluxo de vídeo
     myPeer.on('call', call => {
-      // Respondemos enviando nossa câmera
       call.answer(stream);
       const video = document.createElement('video');
       
-      // O PeerJS puro não envia strings nativamente no 'call', então usamos um truque simples:
-      // Quando o stream remoto chegar, o socket atualizará os metadados do nome.
       call.on('stream', userVideoStream => {
-        // Busca se existe algum nome atrelado a esse peer que veio do socket
+        // Puxa o nome de quem está ligando através dos metadados da chamada
         const senderName = call.options.metadata?.senderName || "Participante";
         addVideoStream(video, userVideoStream, senderName, call.peer);
       });
@@ -67,36 +64,37 @@ function startWebRTC() {
       });
     });
 
-    // Avisa o servidor que estamos prontos e envia o nosso Nickname
+    // Entra na sala informando seu ID único e o seu Apelido
     socket.emit('join-room', 'unifesp-sala-principal', myPeer.id, myNickname);
 
+    // Quando outro usuário se conectar na sala, você liga para ele
     socket.on('user-connected', (userId, userNickname) => {
-      // Conecta ao novo usuário passando o nosso nome nos metadados da ligação
       connectToNewUser(userId, stream, userNickname);
     });
 
   }).catch(err => {
     console.error("Erro de mídia:", err);
-    alert("Não foi possível acessar sua câmera/microfone. Verifique se deu permissão no seu navegador ou se outro app (como Teams/Zoom) já não está usando ela.");
+    alert("Não foi possível acessar a câmera e microfone. Certifique-se de dar permissões no navegador.");
   });
 }
 
-// Quando alguém sai, fecha o vídeo correspondente
+// Remove o bloco do usuário que sair
 socket.on('user-disconnected', userId => {
   if (peers[userId]) {
     peers[userId].close();
   }
-  // Remove pelo ID do container do peer
   const containerToRemove = document.getElementById(`wrapper-${userId}`);
   if (containerToRemove) containerToRemove.remove();
 });
 
+// Atualiza o contador de cabeçalho
 socket.on('update-peer-count', count => {
   if (participantCount) participantCount.innerText = count;
 });
 
+// Função para originar ligações para novos integrantes
 function connectToNewUser(userId, stream, userNickname) {
-  // Passa nosso nome no metadata para que a outra ponta saiba quem está ligando
+  // Anexa o seu apelido nos metadados antes de fazer a ligação WebRTC
   const call = myPeer.call(userId, stream, {
     metadata: { senderName: myNickname }
   });
@@ -115,6 +113,7 @@ function connectToNewUser(userId, stream, userNickname) {
   peers[userId] = call;
 }
 
+// Renderiza a janela de vídeo conforme as classes CSS
 function addVideoStream(video, stream, userName, userId = null) {
   video.srcObject = stream;
   video.addEventListener('loadedmetadata', () => {
@@ -124,7 +123,7 @@ function addVideoStream(video, stream, userName, userId = null) {
   const videoWrapper = document.createElement('div');
   videoWrapper.classList.add('video-wrapper');
   if(userId) {
-    videoWrapper.id = `wrapper-${userId}`; // Atribui ID para remoção limpa
+    videoWrapper.id = `wrapper-${userId}`;
   }
 
   const nameLabel = document.createElement('div');
@@ -136,7 +135,7 @@ function addVideoStream(video, stream, userName, userId = null) {
   videoGrid.append(videoWrapper);
 }
 
-// Controles de Mudo e Câmera
+// Controles dos botões de Mudo e Câmera
 const micBtn = document.getElementById('mic-btn');
 const camBtn = document.getElementById('cam-btn');
 
