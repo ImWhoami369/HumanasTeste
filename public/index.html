@@ -11,7 +11,7 @@
 
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #1a1a1a; /* Fundo escuro estilo Zoom */
+      background: #202124; /* Fundo escuro oficial Google Meet */
       color: #ffffff;
       height: 100vh;
       display: flex;
@@ -19,7 +19,7 @@
       overflow: hidden;
     }
 
-    /* TELA DE LOBBY / APELIDO */
+    /* LOBBY INICIAL */
     #lobby-container {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -38,53 +38,53 @@
       z-index: -100;
       transform: translate(-50%, -50%);
       object-fit: cover;
-      filter: brightness(0.3);
+      filter: brightness(0.35);
     }
 
     .lobby-box {
-      background: rgba(30, 30, 30, 0.75);
-      padding: 30px;
-      border-radius: 12px;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      background: rgba(32, 33, 36, 0.8);
+      padding: 35px;
+      border-radius: 16px;
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
       border: 1px solid rgba(255, 255, 255, 0.1);
       text-align: center;
       width: 85%;
-      max-width: 360px;
-      box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+      max-width: 380px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
     }
 
-    .lobby-box h2 { margin-bottom: 20px; font-size: 1.4rem; color: #fff; font-weight: 600; }
+    .lobby-box h2 { margin-bottom: 20px; font-size: 1.5rem; font-weight: 600; }
 
     .lobby-box input {
       width: 100%;
-      padding: 12px;
-      border-radius: 6px;
+      padding: 14px;
+      border-radius: 8px;
       border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(0, 0, 0, 0.4);
       color: #fff;
       font-size: 1rem;
-      margin-bottom: 25px;
+      margin-bottom: 20px;
       outline: none;
       text-align: center;
     }
 
     .lobby-box button {
       width: 100%;
-      padding: 12px;
+      padding: 14px;
       border: none;
-      border-radius: 6px;
-      background: #2D8CFF; /* Azul clássico do Zoom */
-      color: #fff;
+      border-radius: 8px;
+      background: #8ab4f8; /* Azul Meet */
+      color: #202124;
       font-weight: bold;
       font-size: 1rem;
       cursor: pointer;
       transition: background 0.2s;
     }
 
-    .lobby-box button:hover { background: #1a75e6; }
+    .lobby-box button:hover { background: #aecbfa; }
 
-    /* CONTAINER DA REUNIÃO */
+    /* ÁREA DA REUNIÃO */
     #meeting-container {
       display: none;
       flex-direction: column;
@@ -93,100 +93,88 @@
     }
 
     header {
-      padding: 12px 20px;
-      background: #1a1a1a;
+      padding: 15px 25px;
+      background: rgba(0, 0, 0, 0.15);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid #2d2d2d;
     }
 
-    .room-title { font-size: 0.95rem; font-weight: 500; display: flex; align-items: center; gap: 8px; }
-    .room-title .live-indicator { width: 8px; height: 8px; background-color: #00FF87; border-radius: 50%; }
+    .room-title { font-size: 1rem; font-weight: 500; display: flex; align-items: center; gap: 10px; }
+    .room-title .live-indicator { width: 8px; height: 8px; background-color: #00fa9a; border-radius: 50%; }
 
-    /* Área Central dos Vídeos (Grid Nativo estilo Zoom) */
+    /* MOSAICO DE JANELINHAS (ESTILO MEET) */
     #video-container {
       flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 10px;
-      background: #000000; /* Fundo preto para destacar as câmeras */
-      overflow: hidden;
+      padding: 15px;
+      overflow-y: auto; /* Permite rolar se entrarem dezenas de pessoas */
     }
 
     #video-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(45%, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Cria o efeito "caixinhas" automático */
+      gap: 12px;
       width: 100%;
-      height: 100%;
-      max-width: 1200px;
-      align-content: center;
+      max-width: 1280px;
       justify-content: center;
     }
 
-    /* Ajuste responsivo automático para telas pequenas (Celular em pé) */
-    @media (max-width: 600px) {
-      #video-grid {
-        grid-template-columns: repeat(auto-fit, minmax(90%, 1fr));
-      }
+    /* Caso seja apenas 1 participante na chamada, a caixinha expande mais */
+    #video-grid:has(> :nth-child(1):last-child) {
+      grid-template-columns: minmax(280px, 700px);
     }
 
     .video-wrapper {
       position: relative;
-      background: #242424;
-      border-radius: 6px;
+      background: #3c4043;
+      border-radius: 8px;
       overflow: hidden;
-      aspect-ratio: 16 / 9;
+      aspect-ratio: 16 / 9; /* Mantém formato de câmera padrão de cinema */
       width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid #333;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
     video.user-video {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transform: scaleX(-1);
     }
 
     .user-name {
       position: absolute;
-      bottom: 8px; left: 8px;
-      background: rgba(0, 0, 0, 0.6);
-      padding: 3px 8px;
+      bottom: 10px; left: 10px;
+      background: rgba(32, 33, 36, 0.75);
+      padding: 4px 10px;
       border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: 500;
+      font-size: 0.8rem;
     }
 
-    /* Barra de Controles Inferior do Zoom */
+    /* BARRA DE CONTROLES INFERIOR */
     .controls-panel {
-      padding: 15px;
+      padding: 20px;
       display: flex;
       justify-content: center;
-      align-items: center;
-      background: #1a1a1a;
-      border-top: 1px solid #2d2d2d;
+      background: #202124;
     }
 
-    .controls-wrapper { display: flex; gap: 15px; }
+    .controls-wrapper { display: flex; gap: 12px; }
 
     .control-btn {
-      width: 44px; height: 44px;
-      border-radius: 8px;
-      background: #242424;
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: #3c4043;
       border: none; color: #fff;
-      font-size: 1rem; cursor: pointer;
+      font-size: 1.1rem; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.2s;
     }
-    .control-btn:hover { background: #333333; }
+    .control-btn:hover { background: #4f5357; }
 
-    .control-btn.leave-btn { background: #ea4335; }
+    .control-btn.leave-btn { background: #ea4335; width: 55px; border-radius: 20px; }
     .control-btn.leave-btn:hover { background: #f05a4f; }
     .control-btn.muted { background: #ea4335; }
   </style>
@@ -203,8 +191,8 @@
     </video>
     <div class="lobby-box">
       <h2>Unifesp 3.0</h2>
-      <input type="text" id="nickname-input" placeholder="Seu nome..." maxlength="15" autofocus>
-      <button id="enter-btn">Entrar Agora</button>
+      <input type="text" id="nickname-input" placeholder="Seu nome para entrar..." maxlength="15" autofocus>
+      <button id="enter-btn">Entrar na Sala</button>
     </div>
   </div>
 
@@ -212,10 +200,10 @@
     <header>
       <div class="room-title">
         <div class="live-indicator"></div>
-        <span>Sala de Bate-Papo</span>
+        <span>Sala de Bate-Papo Acadêmica</span>
       </div>
-      <div style="font-size: 0.85rem; color: #aaa;">
-        <i class="fa-solid fa-user-group"></i> <span id="participant-count">1</span> online
+      <div style="font-size: 0.9rem; color: #9aa0a6;">
+        <i class="fa-solid fa-user-group"></i> <span id="participant-count">1</span> na reunião
       </div>
     </header>
 
