@@ -1,7 +1,7 @@
 {
-  "name": "unifesp-video-chat",
+  "name": "By-TheGhost-369",
   "version": "1.0.0",
-  "description": "Sala de reunião WebRTC",
+  "description": "Sala de reunião WebRTC - Unifesp By: TheGhost369",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
