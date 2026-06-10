@@ -2,7 +2,16 @@ const socket = io('/');
 const videoGrid = document.getElementById('video-grid');
 const participantCount = document.getElementById('participant-count');
 
-// Servidores STUN públicos do Google para garantir o funcionamento fora da rede local (no Render)
+const lobbyContainer = document.getElementById('lobby-container');
+const meetingContainer = document.getElementById('meeting-container');
+const nicknameInput = document.getElementById('nickname-input');
+const enterBtn = document.getElementById('enter-btn');
+
+let myNickname = "Usuário";
+let myVideoStream;
+const myVideo = document.createElement('video');
+myVideo.muted = true; 
+
 const myPeer = new Peer(undefined, {
   config: {
     'iceServers': [
@@ -12,109 +21,122 @@ const myPeer = new Peer(undefined, {
   }
 });
 
-let myVideoStream;
-const myVideo = document.createElement('video');
-myVideo.muted = true; // Muta a própria voz para evitar eco local
+const peers = {};
 
-const peers = {}; // Armazena as chamadas ativas
+// Escuta o clique para entrar na reunião
+enterBtn.addEventListener('click', () => {
+  const nameValue = nicknameInput.value.trim();
+  if (nameValue === "") {
+    alert("Por favor, insira um apelido para entrar.");
+    return;
+  }
+  myNickname = nameValue;
 
-// Captura de mídia (Câmera e Microfone)
-navigator.mediaDevices.getUserMedia({
-  video: true,
-  audio: true
-}).then(stream => {
-  myVideoStream = stream;
-  
-  // Adiciona sua própria câmera na tela com a tag "Você"
-  addVideoStream(myVideo, stream, "Você");
+  // Esconde o lobby e mostra a reunião
+  lobbyContainer.style.display = 'none';
+  meetingContainer.style.display = 'flex';
 
-  // Atende chamadas recebidas de outros usuários
-  myPeer.on('call', call => {
-    call.answer(stream); // Responde enviando nossa câmera
-    const video = document.createElement('video');
-    
-    // Quando o vídeo do outro usuário chegar, renderiza na tela
-    call.on('stream', userVideoStream => {
-      addVideoStream(video, userVideoStream, "Participante");
-    });
-
-    // Se o outro usuário fechar a chamada
-    call.on('close', () => {
-      video.parentElement.remove();
-    });
-  });
-
-  // Escuta quando um novo usuário entra na sala para ligar para ele
-  socket.on('user-connected', userId => {
-    connectToNewUser(userId, stream);
-  });
-
-}).catch(err => {
-  console.error("Falha ao acessar dispositivos de mídia:", err);
-  alert("Por favor, permita o acesso à câmera e ao microfone para entrar na reunião.");
+  // Inicializa o WebRTC após o clique (Evita bloqueios automáticos do navegador)
+  startWebRTC();
 });
 
-// Remove o bloco do participante que se desconectou
+function startWebRTC() {
+  navigator.mediaDevices.getUserMedia({
+    video: true,
+    audio: true
+  }).then(stream => {
+    myVideoStream = stream;
+    addVideoStream(myVideo, stream, `${myNickname} (Você)`);
+
+    // Atende chamadas e escuta os dados extras (como o nome do outro participante)
+    myPeer.on('call', call => {
+      // Respondemos enviando nossa câmera
+      call.answer(stream);
+      const video = document.createElement('video');
+      
+      // O PeerJS puro não envia strings nativamente no 'call', então usamos um truque simples:
+      // Quando o stream remoto chegar, o socket atualizará os metadados do nome.
+      call.on('stream', userVideoStream => {
+        // Busca se existe algum nome atrelado a esse peer que veio do socket
+        const senderName = call.options.metadata?.senderName || "Participante";
+        addVideoStream(video, userVideoStream, senderName, call.peer);
+      });
+
+      call.on('close', () => {
+        video.parentElement.remove();
+      });
+    });
+
+    // Avisa o servidor que estamos prontos e envia o nosso Nickname
+    socket.emit('join-room', 'unifesp-sala-principal', myPeer.id, myNickname);
+
+    socket.on('user-connected', (userId, userNickname) => {
+      // Conecta ao novo usuário passando o nosso nome nos metadados da ligação
+      connectToNewUser(userId, stream, userNickname);
+    });
+
+  }).catch(err => {
+    console.error("Erro de mídia:", err);
+    alert("Não foi possível acessar sua câmera/microfone. Verifique se deu permissão no seu navegador ou se outro app (como Teams/Zoom) já não está usando ela.");
+  });
+}
+
+// Quando alguém sai, fecha o vídeo correspondente
 socket.on('user-disconnected', userId => {
   if (peers[userId]) {
     peers[userId].close();
   }
+  // Remove pelo ID do container do peer
+  const containerToRemove = document.getElementById(`wrapper-${userId}`);
+  if (containerToRemove) containerToRemove.remove();
 });
 
-// Atualiza o contador de participantes na barra superior
 socket.on('update-peer-count', count => {
-  if (participantCount) {
-    participantCount.innerText = count;
-  }
+  if (participantCount) participantCount.innerText = count;
 });
 
-// Assim que o PeerJS gera seu ID único, você entra na sala padrão
-myPeer.on('open', id => {
-  socket.emit('join-room', 'unifesp-sala-principal', id);
-});
-
-// Função para ligar para os novos usuários da sala
-function connectToNewUser(userId, stream) {
-  const call = myPeer.call(userId, stream);
+function connectToNewUser(userId, stream, userNickname) {
+  // Passa nosso nome no metadata para que a outra ponta saiba quem está ligando
+  const call = myPeer.call(userId, stream, {
+    metadata: { senderName: myNickname }
+  });
+  
   const video = document.createElement('video');
   
   call.on('stream', userVideoStream => {
-    addVideoStream(video, userVideoStream, "Participante");
+    addVideoStream(video, userVideoStream, userNickname, userId);
   });
   
   call.on('close', () => {
-    video.parentElement.remove();
+    const containerToRemove = document.getElementById(`wrapper-${userId}`);
+    if (containerToRemove) containerToRemove.remove();
   });
 
   peers[userId] = call;
 }
 
-// Injeta o elemento de vídeo seguindo a risca a estrutura do CSS Premium
-function addVideoStream(video, stream, userName) {
+function addVideoStream(video, stream, userName, userId = null) {
   video.srcObject = stream;
   video.addEventListener('loadedmetadata', () => {
     video.play();
   });
 
-  // Cria o container do vídeo (.video-wrapper)
   const videoWrapper = document.createElement('div');
   videoWrapper.classList.add('video-wrapper');
+  if(userId) {
+    videoWrapper.id = `wrapper-${userId}`; // Atribui ID para remoção limpa
+  }
 
-  // Cria a etiqueta de texto com o nome do usuário (.user-name)
   const nameLabel = document.createElement('div');
   nameLabel.classList.add('user-name');
   nameLabel.innerText = userName;
 
-  // Monta a estrutura e adiciona na grade principal
   videoWrapper.append(video);
   videoWrapper.append(nameLabel);
   videoGrid.append(videoWrapper);
 }
 
-/* ==========================================================================
-   Lógica dos Botões de Controle (Mute / Unmute e Câmera ON/OFF)
-   ========================================================================== */
-
+// Controles de Mudo e Câmera
 const micBtn = document.getElementById('mic-btn');
 const camBtn = document.getElementById('cam-btn');
 
