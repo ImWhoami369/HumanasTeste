@@ -24,6 +24,7 @@
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
       display: flex;
+      flex-direction: column; /* Alterado para organizar a box e o footer verticalmente */
       justify-content: center;
       align-items: center;
       z-index: 999;
@@ -31,7 +32,8 @@
     #bg-video {
       position: absolute;
       top: 50%; left: 50%;
-      min-width: 100%; min-height: 100%;
+      min-width: 100%;
+      min-height: 100%;
       z-index: -100;
       transform: translate(-50%, -50%);
       object-fit: cover;
@@ -43,14 +45,18 @@
       backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
       border: 1px solid rgba(255, 255, 255, 0.1);
       text-align: center; width: 85%; max-width: 380px;
+      margin-bottom: 20px;
     }
     .lobby-box h2 { margin-bottom: 20px; font-size: 1.5rem; }
     .lobby-box input {
-      width: 100%; padding: 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(0, 0, 0, 0.4); color: #fff; font-size: 1rem; margin-bottom: 20px; text-align: center; outline: none;
+      width: 100%; padding: 14px; border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.4); color: #fff; font-size: 1rem; margin-bottom: 20px; text-align: center;
+      outline: none;
     }
     .lobby-box button {
-      width: 100%; padding: 14px; border: none; border-radius: 8px;
+      width: 100%; padding: 14px; border: none;
+      border-radius: 8px;
       background: #8ab4f8; color: #202124; font-weight: bold; font-size: 1rem; cursor: pointer;
     }
 
@@ -142,7 +148,7 @@
     .chat-header { 
       padding: 15px; 
       border-bottom: 1px solid #3c4043; 
-      font-weight: 600; 
+      font-weight: 600;
       display: flex; 
       justify-content: space-between; 
       align-items: center; 
@@ -160,7 +166,8 @@
     }
     
     #chat-messages {
-      flex: 1; padding: 15px; overflow-y: auto;
+      flex: 1;
+      padding: 15px; overflow-y: auto;
       display: flex; flex-direction: column; gap: 12px;
     }
 
@@ -170,7 +177,8 @@
 
     .chat-input-area { padding: 12px; border-top: 1px solid #3c4043; display: flex; gap: 8px; }
     #chat-input {
-      flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #3c4043;
+      flex: 1; padding: 10px; border-radius: 20px;
+      border: 1px solid #3c4043;
       background: #2d2e30; color: #fff; outline: none; font-size: 0.85rem;
     }
     #send-btn {
@@ -195,8 +203,16 @@
       }
     }
 
-    /* CONTROLES INFERIORES */
-    .controls-panel { padding: 20px; display: flex; justify-content: center; background: #202124; border-top: 1px solid #3c4043; }
+    /* CONTROLES INFERIORES E COPYRIGHT */
+    .controls-panel { 
+      padding: 15px 20px 5px 20px; /* Reduzido o padding inferior */
+      display: flex; 
+      flex-direction: column; /* Mudado para column para alinhar o painel e o copyright */
+      align-items: center;
+      gap: 10px;
+      background: #202124; 
+      border-top: 1px solid #3c4043; 
+    }
     .controls-wrapper { display: flex; gap: 12px; }
     .control-btn {
       width: 48px; height: 48px; border-radius: 50%; background: #3c4043;
@@ -207,6 +223,19 @@
     .control-btn.leave-btn { background: #ea4335; width: 55px; border-radius: 20px; }
     .control-btn.muted { background: #ea4335; }
     .control-btn.chat-toggle-btn { background: #34a853; }
+
+    /* ESTILO DO COPYRIGHT */
+    .copyright-footer {
+      font-size: 0.75rem;
+      color: #9aa0a6;
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
+    .lobby-footer {
+      position: absolute;
+      bottom: 20px;
+      width: 100%;
+    }
   </style>
 
   <script src="/socket.io/socket.io.js" defer></script>
@@ -224,13 +253,16 @@
       <input type="text" id="nickname-input" placeholder="Seu nome..." maxlength="15" autofocus>
       <button id="enter-btn">Entrar na Sala</button>
     </div>
+    <div class="copyright-footer lobby-footer">
+      <p>&copy; 2026 - Todos os direitos reservados a By: TheGhost</p>
+    </div>
   </div>
 
   <div id="meeting-container">
     <header>
       <div class="room-title">
         <div class="live-indicator"></div>
-        <span> .*.Bem-Vindo a Sala .*. </span>
+        <span> .*.Bem-Vindo a Sala .*.</span>
       </div>
       <div style="font-size: 0.9rem; color: #9aa0a6;">
         <i class="fa-solid fa-user-group"></i> <span id="participant-count">0</span> na reunião
@@ -261,6 +293,9 @@
         <button class="control-btn" id="cam-btn"><i class="fa-solid fa-video"></i></button>
         <button class="control-btn chat-toggle-btn" id="chat-box-btn"><i class="fa-solid fa-message"></i></button>
         <button class="control-btn leave-btn" onclick="window.location.reload()"><i class="fa-solid fa-phone-slash"></i></button>
+      </div>
+      <div class="copyright-footer">
+        <p>&copy; 2026 - Todos os direitos reservados a By: TheGhost</p>
       </div>
     </div>
   </div>
